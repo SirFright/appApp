@@ -1,10 +1,19 @@
 import { useEffect, useMemo, useRef, type MutableRefObject } from 'react'
-import { MapContainer, Marker, Popup, TileLayer, useMap } from 'react-leaflet'
+import {
+  Circle,
+  MapContainer,
+  Marker,
+  Popup,
+  TileLayer,
+  useMap,
+} from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import type { Contractor } from '../types'
 import { useUserState } from '../store/userState'
+import { useFilters } from '../state/filters'
 import { CT_CENTER } from '../data/ctTowns'
+import { formatMiles, type NamedPlace } from '../lib/geo'
 
 export interface PinStatus {
   color: string
@@ -42,6 +51,13 @@ function pinIcon(color: string): L.DivIcon {
   return icon
 }
 
+const centerIcon = L.divIcon({
+  className: 'center-pin',
+  html: '<div class="center-dot"></div>',
+  iconSize: [22, 22],
+  iconAnchor: [11, 11],
+})
+
 function FlyController({
   items,
   focusId,
@@ -68,6 +84,29 @@ function FlyController({
   return null
 }
 
+function CenterController({
+  center,
+  radiusMi,
+}: {
+  center: NamedPlace | null
+  radiusMi: number | null
+}) {
+  const map = useMap()
+  useEffect(() => {
+    if (!center) return
+    if (radiusMi != null) {
+      const bounds = L.latLng(center.lat, center.lng).toBounds(
+        radiusMi * 1609.34 * 2,
+      )
+      map.fitBounds(bounds, { padding: [36, 36], maxZoom: 13 })
+    } else {
+      map.flyTo([center.lat, center.lng], 10, { duration: 0.6 })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [center?.lat, center?.lng, radiusMi])
+  return null
+}
+
 interface Props {
   items: Contractor[]
   focusId: string | null
@@ -82,9 +121,9 @@ export default function MapView({
   onDetails,
 }: Props) {
   const { state, get, toggleFavorite } = useUserState()
+  const { center, radiusMi } = useFilters()
   const markers = useRef<Map<string, L.Marker>>(new Map())
 
-  // Recompute marker colors when user state changes.
   const decorated = useMemo(
     () => items.map((c) => ({ c, status: statusOf(get(c.id)) })),
     [items, state, get],
@@ -111,6 +150,22 @@ export default function MapView({
         markers={markers}
         onConsumed={onFocusConsumed}
       />
+      <CenterController center={center} radiusMi={radiusMi} />
+
+      {center && radiusMi != null && (
+        <Circle
+          center={[center.lat, center.lng]}
+          radius={radiusMi * 1609.34}
+          pathOptions={{
+            color: '#38bdf8',
+            weight: 1.5,
+            fillColor: '#38bdf8',
+            fillOpacity: 0.08,
+          }}
+        />
+      )}
+      {center && <Marker position={[center.lat, center.lng]} icon={centerIcon} />}
+
       {decorated.map(({ c, status }) => {
         const rec = get(c.id)
         const fav = !!rec.favorite
@@ -132,6 +187,12 @@ export default function MapView({
                   {c.town}, {c.state}
                   {c.approxLocation ? ' · approx.' : ''}
                 </div>
+                {c.distanceMi != null && (
+                  <div className="pc-meta">
+                    📍 {formatMiles(c.distanceMi)}
+                    {center ? ` from ${center.label}` : ''}
+                  </div>
+                )}
                 <div className="pc-meta">{c.status} license</div>
                 <div className="pc-actions">
                   <button

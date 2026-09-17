@@ -15,6 +15,7 @@ import {
   telHref,
   webSearchUrl,
 } from '../lib/format'
+import { formatMiles } from '../lib/geo'
 import {
   Badge,
   Building,
@@ -102,6 +103,9 @@ export default function CompanyCard({
             <span className="lic">{c.licenseType}</span>
             <span>·</span>
             <span>{c.town}, {c.state}</span>
+            {c.distanceMi != null && (
+              <span className="pill pill--dist">{formatMiles(c.distanceMi)}</span>
+            )}
             {isNew && <span className="pill pill--new">NEW</span>}
           </div>
         </div>

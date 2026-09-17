@@ -2,6 +2,7 @@ import type { Segment } from '../types'
 import { useFilters } from '../state/filters'
 import { useTowns, type Counts } from '../lib/useVisible'
 import { Search } from './Icons'
+import DistanceControl from './DistanceControl'
 
 const SEGMENTS: { key: Segment; label: string }[] = [
   { key: 'all', label: 'All' },
@@ -14,6 +15,7 @@ interface Props {
   counts: Counts
   showSegments?: boolean
   showTown?: boolean
+  showDistance?: boolean
   placeholder?: string
 }
 
@@ -21,6 +23,7 @@ export default function Filters({
   counts,
   showSegments = true,
   showTown = true,
+  showDistance = true,
   placeholder = 'Search company, town, license…',
 }: Props) {
   const { query, setQuery, segment, setSegment, town, setTown } = useFilters()
@@ -72,6 +75,8 @@ export default function Filters({
           </select>
         </div>
       )}
+
+      {showDistance && <DistanceControl />}
 
       {showSegments && (
         <div className="segment" role="tablist" aria-label="Filter by status">

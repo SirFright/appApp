@@ -41,6 +41,8 @@ export interface Contractor {
   description?: string
   /** Where this record came from. */
   source: 'sample' | 'live'
+  /** Transient: miles from the active distance-search center, when one is set. */
+  distanceMi?: number
 }
 
 export interface ApplicationInfo {

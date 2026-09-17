@@ -3,6 +3,7 @@ import type { Contractor, Segment, UserState } from '../types'
 import { useData } from '../data/dataSource'
 import { useUserState } from '../store/userState'
 import { useFilters } from '../state/filters'
+import { haversineMiles } from './geo'
 
 export interface Counts {
   all: number
@@ -44,8 +45,10 @@ function inSegment(state: UserState, id: string, segment: Segment): boolean {
 }
 
 /**
- * Contractors after search + town filters, and the per-segment counts
- * computed over that same base (so the tab badges reflect the search).
+ * Contractors after search + town + distance filters, and the per-segment
+ * counts computed over that same base (so the tab badges reflect the filters).
+ * When a distance center is set, each contractor carries `distanceMi` and the
+ * list is ordered nearest-first.
  */
 export function useVisibleContractors(): {
   base: Contractor[]
@@ -54,14 +57,25 @@ export function useVisibleContractors(): {
 } {
   const { contractors } = useData()
   const { state } = useUserState()
-  const { query, town, segment } = useFilters()
+  const { query, town, segment, center, radiusMi } = useFilters()
 
   return useMemo(() => {
-    const base = contractors.filter(
+    let base = contractors.filter(
       (c) =>
         matchesSearch(c, query) &&
         (!town || c.town.toLowerCase() === town.toLowerCase()),
     )
+
+    // Distance filter: attach distanceMi, optionally cap by radius.
+    if (center) {
+      base = base.map((c) => ({
+        ...c,
+        distanceMi: haversineMiles(center, c),
+      }))
+      if (radiusMi != null) {
+        base = base.filter((c) => (c.distanceMi ?? Infinity) <= radiusMi)
+      }
+    }
 
     const counts: Counts = {
       all: base.length,
@@ -73,6 +87,13 @@ export function useVisibleContractors(): {
     const list = base.filter((c) => inSegment(state, c.id, segment))
 
     list.sort((a, b) => {
+      // A distance search always orders nearest-first.
+      if (center) {
+        return (
+          (a.distanceMi ?? Infinity) - (b.distanceMi ?? Infinity) ||
+          a.businessName.localeCompare(b.businessName)
+        )
+      }
       if (segment === 'favorites') {
         return (
           (state[b.id]?.favoritedAt ?? 0) - (state[a.id]?.favoritedAt ?? 0) ||
@@ -96,7 +117,7 @@ export function useVisibleContractors(): {
     })
 
     return { base, list, counts }
-  }, [contractors, state, query, town, segment])
+  }, [contractors, state, query, town, segment, center, radiusMi])
 }
 
 /** Distinct town names present in the dataset, alphabetized. */
